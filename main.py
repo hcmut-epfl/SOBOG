@@ -25,27 +25,7 @@ parser.add_argument("--train_size", type=float, default=0.6)
 args = parser.parse_args()
 
 if __name__ == "__main__":
-    dataset = torch.load('data/dataset_full.pt')
-    # idx = 0
-    # sample_user = dataset[idx]
-    # print('User')
-    # print(sample_user[0])
-    # print(sample_user[0].shape)
-    # print('Encoded tweet (sparse matrix)')
-    # print(sample_user[1])
-    # print(sample_user[1].shape)
-    # print('Tweet adjacency')
-    # print(sample_user[2])
-    # print(sample_user[2].shape)
-    # print('User-post matrix')
-    # print(sample_user[3])
-    # print(sample_user[3].shape)
-    # print('Label')
-    # print(sample_user[4])
-    # print(sample_user[4].shape)
-    # print('Tweet label')
-    # print(sample_user[5])
-    # print(sample_user[5].shape)
+    dataset = torch.load('data/dataset.pt')
 
     n_users = len(dataset)
     train_size = 0.6

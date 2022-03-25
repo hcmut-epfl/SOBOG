@@ -69,7 +69,7 @@ def collate_fn_padd(batch):
 
     # 5000 is tf-idf dimension, change it when calling any args
     user = np.zeros((batch_size, 20))
-    tweet = np.zeros((batch_size, max_length, 10000))
+    tweet = np.zeros((batch_size, max_length, 5000))
     adj = np.zeros((batch_size, max_length, max_length))
     up = np.zeros((batch_size, max_length))
     label = np.zeros((batch_size, 1))
