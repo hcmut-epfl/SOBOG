@@ -9,7 +9,7 @@ class GAT(torch.nn.Module):
         self.W = nn.Linear(n_in_feature, n_out_feature)
         self.A = nn.Parameter(torch.zeros(size=(n_out_feature, n_out_feature)))
         self.gate = nn.Linear(n_out_feature*2, 1)
-        self.leakyrelu = nn.LeakyReLU(0.2)
+        self.leakyrelu = nn.LeakyReLU(0.0)
         self.zeros = torch.zeros(1)
         if gpu > 0:
             self.zeros = self.zeros.cuda()
