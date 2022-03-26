@@ -2,6 +2,7 @@ from types import MethodType
 import numpy as np
 import torch
 from torch import nn
+from main import n_post_features
 
 
 def set_cuda_visible_device(ngpus):
@@ -69,7 +70,7 @@ def collate_fn_padd(batch):
 
     # 5000 is tf-idf dimension, change it when calling any args
     user = np.zeros((batch_size, 20))
-    tweet = np.zeros((batch_size, max_length, 5000))
+    tweet = np.zeros((batch_size, max_length, n_post_features))
     adj = np.zeros((batch_size, max_length, max_length))
     up = np.zeros((batch_size, max_length))
     label = np.zeros((batch_size, 1))

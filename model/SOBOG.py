@@ -36,7 +36,6 @@ class SOBOG(torch.nn.Module):
         up_posts_aggre = torch.flatten(up_posts_aggre, start_dim=1)
         up_embed = torch.cat([users_embed, up_posts_aggre], 1)
 
-
         for module in self.post_classifier:
             posts_embed = module(posts_embed)
         post_label = torch.sigmoid(posts_embed)        

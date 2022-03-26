@@ -12,23 +12,26 @@ parser = ArgumentParser(description="SOBOG")
 parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--epoch", type=int, default=2)
 parser.add_argument("--batch_size", type=int, default=32)
-parser.add_argument("--enable_gpu", type=bool, default=False)
+parser.add_argument("--enable_gpu", type=bool, default=True)
 parser.add_argument("--n_user_features", type=int, default=20)
 parser.add_argument("--d_user_embed", type=int, default=50)
-parser.add_argument("--n_post_features", type=int, default=5000)
+parser.add_argument("--n_post_features", type=int, default=50000)
 parser.add_argument("--d_post_embed", type=int, default=100)
 parser.add_argument("--n_gat_layers", type=int, default=3)
 parser.add_argument("--d_cls", type=int, default=16)
 parser.add_argument("--n_cls_layer", type=int, default=4)
 parser.add_argument("--alpha", type=float, default=0.5)
 parser.add_argument("--train_size", type=float, default=0.6)
+parser.add_argument("--path", type=str, default='data/dataset_full.pt')
 args = parser.parse_args()
 
+n_post_features = args.n_post_features
+
 if __name__ == "__main__":
-    dataset = torch.load('data/dataset.pt')
+    dataset = torch.load(args.path)
 
     n_users = len(dataset)
-    train_size = 0.6
+    train_size = args.train_size
     train_length = int(n_users * train_size)
     test_length = n_users - train_length
 
