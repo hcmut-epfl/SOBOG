@@ -69,7 +69,8 @@ if __name__ == "__main__":
 
     # Loss function
     loss_user_fn = torch.nn.BCELoss()
-    loss_tweet_fn = utils.tweet_loss_fn
+    # loss_tweet_fn = utils.tweet_loss_fn
+    loss_tweet_fn = torch.nn.BCELoss()
 
     train_losses_epoch = list()
     test_losses_epoch = list()

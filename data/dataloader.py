@@ -40,12 +40,9 @@ class TwitterDataset(Dataset):
         print("Vectorizing tweets...")
         self.tweet = self.feature_tweet(self.tweet, tfidf_pretrained)
 
-        # print("Removing user not having tweet...")
-        # self.user = self.remove_user(tweet_metadata, self.user)
-
-        print("Generating tweeting graph... Skipping...")
-        # self.tweet_adj, self.utr_matrix, self.up_matrix = self.generate_adjacency_matrix(tweet_metadata, self.ids)
-        # self.tweet_adj, self.utr_matrix, self.up_matrix = self.generate_adjacency_matrix(self.tweet, self.user)
+        print("Generating tweeting graph... ")
+        self.tweet_adj, self.utr_matrix, self.up_matrix = self.generate_adjacency_matrix(tweet_metadata, self.ids)
+        self.tweet_adj, self.utr_matrix, self.up_matrix = self.generate_adjacency_matrix(self.tweet, self.user)
 
         print("Converting user dataframe to numpy...")
         self.user = self.user.to_numpy()
@@ -189,13 +186,13 @@ class TwitterDataset(Dataset):
 
     def feature_tweet(self, tweet_df, adapt_pretrained):
         if adapt_pretrained:
-            with open('vectorizer.pk', 'rb') as fin:
+            with open('vect/vectorizer.pk', 'rb') as fin:
                 vect = pickle.load(fin)
             v = vect.transform(tweet_df)
         else:
-            vect = TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=50000)
+            vect = TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=5000)
             v = vect.fit_transform(tweet_df)
-            with open('vectorizer.pk', 'wb') as fin:
+            with open('vect/vectorizer.pk', 'wb') as fin:
                 pickle.dump(vect, fin)
         return v
 
@@ -283,11 +280,13 @@ class TwitterDataset(Dataset):
         return len(self.user)
 
 if __name__ == "__main__":
-    # dataset = TwitterDataset(tfidf_pretrained=False, limit_tweets=None)
+    dataset = TwitterDataset(tfidf_pretrained=False, limit_tweets=None)
     # torch.save(dataset, 'data/dataset_tfidf.pt')
-    dataset = torch.load('data/dataset_full.pt')
-    tf = torch.load('data/dataset_tfidf.pt')
-    dataset.tweet = tf.tweet
+    # dataset = torch.load('data/dataset_full.pt')
+    # dataset.user_mean.to_csv('mean.csv', index=False)
+    # dataset.user_std.to_csv('std.csv', index=False)
+    # tf = torch.load('data/dataset_tfidf.pt')
+    # dataset.tweet = tf.tweet
     idx = 0
     sample_user = dataset[idx]
     print('User')
