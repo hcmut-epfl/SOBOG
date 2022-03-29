@@ -2,7 +2,6 @@
 /glove
 /word2vec
 /local
-/ckpts
 
 ### JupyterNotebooks ###
 # gitignore template for Jupyter Notebooks
