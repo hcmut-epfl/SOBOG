@@ -28,19 +28,29 @@ class TwitterDataset(Dataset):
             self.user_mean = self.user.mean(axis=0)
             self.user_std = self.user.std(axis=0)
             self.user = (self.user - self.user_mean) / self.user_std
+            self.user.fillna(0, inplace=True)
 
         print("Loading tweet data...")
         self.tweet, tweet_metadata, self.tweet_label = self.get_tweet_data(config, limit_tweets)
 
         print("Preprocessing tweet...")
         self.tweet = self.tweet.apply(self.preprocessing)
+        self.tweet[:2000000:2].to_csv('tweets.csv')
 
         print("Vectorizing tweets...")
         self.tweet = self.feature_tweet(self.tweet, tfidf_pretrained)
 
         print("Generating tweeting graph... ")
         self.tweet_adj, self.utr_matrix, self.up_matrix = self.generate_adjacency_matrix(tweet_metadata, self.ids)
-        self.tweet_adj, self.utr_matrix, self.up_matrix = self.generate_adjacency_matrix(self.tweet, self.user)
+
+        print("Identify user property with respect to each tweet...")
+        self.user_prop_for_tweets = tweet_metadata[['user_id']].merge(
+            pd.concat([self.user, self.ids], axis=1),
+            how='left',
+            left_on='user_id',
+            right_on='id').drop(
+                ['id', 'user_id'],
+                axis=1).to_numpy()
 
         print("Converting user dataframe to numpy...")
         self.user = self.user.to_numpy()
@@ -187,11 +197,13 @@ class TwitterDataset(Dataset):
             with open('vect/vectorizer.pk', 'rb') as fin:
                 vect = pickle.load(fin)
             v = vect.transform(tweet_df)
+            del(vect)
         else:
             vect = TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=5000)
             v = vect.fit_transform(tweet_df)
             with open('vect/vectorizer.pk', 'wb') as fin:
                 pickle.dump(vect, fin)
+            del(vect)
         return v
 
     def remove_user(self, tweet_metadata, user):
@@ -200,6 +212,7 @@ class TwitterDataset(Dataset):
 
     def generate_adjacency_matrix(self, tweet_metadata, ids):
         n_user = len(ids)
+        tweet_metadata.fillna(0, inplace=True)
         edges = pd.DataFrame()
 
         edges['tweet_id'] = tweet_metadata['id']
@@ -211,15 +224,9 @@ class TwitterDataset(Dataset):
         tweet_retweet_id = tweet_metadata['retweeted_status_id']
         edges['linked_id'] = tweet_reply_id + tweet_retweet_id
 
-        rel = pd.merge(edges, edges, how='inner', left_on='linked_id', right_on='tweet_id')
-        rel['is_x_exists'] = rel['user_id_x'].isin(ids)
-        rel['is_y_exists'] = rel['user_id_y'].isin(ids)
-        rel[['user_id_x', 'is_x_exists', 'user_id_y', 'is_y_exists']].to_csv('adp.csv', index=False)
-
         graph = nx.DiGraph()
-        graph.add_edges_from(edges[['linked_id', 'tweet_id']].values)
+        graph.add_edges_from(edges[['linked_id', 'tweet_id']].astype('int64').values)
         graph.remove_node(0)
-
         tweet_adj_matrix = nx.adjacency_matrix(
             graph,
             nodelist=edges['tweet_id'].values
@@ -229,7 +236,7 @@ class TwitterDataset(Dataset):
         up_graph = nx.DiGraph()
         ut_graph.add_nodes_from(ids.values)
         up_graph.add_nodes_from(ids.values)
-        for user_id, tweet_id in edges[['user_id', 'tweet_id']].values:
+        for user_id, tweet_id in edges[['user_id', 'tweet_id']].astype('int64').values:
             related_tweet_ids = set(nx.nodes(nx.dfs_tree(graph, tweet_id)))
             up_graph.add_edge(user_id, tweet_id)
             for id in related_tweet_ids:
@@ -268,42 +275,152 @@ class TwitterDataset(Dataset):
         tweet_rel = self.utr_matrix[idx].A[0]
         selected_tweet = tweet_rel == 1
         tweet = self.tweet[selected_tweet].A
+        owner = self.user_prop_for_tweets[selected_tweet]
         tlabel = self.tweet_label[selected_tweet]
         adj = self.tweet_adj[np.ix_(selected_tweet, selected_tweet)].A
-        up = self.up_matrix[idx, selected_tweet].A
+        up = self.up_matrix[idx, selected_tweet].A[0]
         label = self.label[idx]
-        return user, tweet, adj, up, label, tlabel
+        return user, tweet, owner, adj, up, label, tlabel
     
     def __len__(self):
         return len(self.user)
 
+class SecondTwitterDataset(TwitterDataset):
+    
+    def get_data_config(self) -> Dict:
+        data_parser = RawConfigParser()
+        data_config_file = './config/data.cfg'
+        data_parser.read(data_config_file)
+        return dict(data_parser.items('MIB-2'))
+
+    def get_user_data(self, config: Dict) -> pd.DataFrame:
+        """Acquire user dataframe"""
+        paths_bot_user = config['fake_paths'].split(', ')
+        paths_human = config['human_paths'].split(', ')
+        # dtypes_format = {
+        #     'updated': 'datetime64[ns]',
+        #     'created_at': 'datetime64[ns]',
+        #     'timestamp': 'datetime64[ns]',
+        #     'crawled_at': 'datetime64[ns]'
+        # }
+
+        df_bot_users = pd.concat(
+            [pd.read_csv(path + config['user']) for path in paths_bot_user]
+        ).reset_index(drop=True)
+        df_bot_users['created_at'] = df_bot_users['created_at'].apply(self.convert_long_date)
+        # df_bot_users = df_bot_users.astype(dtype=dtypes_format)
+        df_naive_users = pd.concat(
+            [pd.read_csv(path + config['user']) for path in paths_human]
+        ).reset_index(drop=True)
+        label = np.concatenate([
+                    np.zeros((df_bot_users.shape[0],)),
+                    np.ones((df_naive_users.shape[0],))
+                ])
+        df_users = pd.concat([df_bot_users, df_naive_users], ignore_index=True)
+        df_ids = df_users.pop('id')
+        return df_users, df_ids, label
+
+    def get_tweet_data(self, config, limit_tweets) -> pd.DataFrame:
+        paths_bot = config['fake_paths'].split(', ')
+        paths_human = config['human_paths'].split(', ')
+        replace_map_dict = {
+            "True": 1,
+            "true": 1,
+            "False": 0,
+            "false": 0,
+            "N": np.nan,
+        }
+        cols = [
+            "created_at",
+            "id",
+            "text",
+            "source",
+            "user_id",
+            "truncated",
+            "in_reply_to_status_id",
+            "in_reply_to_user_id",
+            "in_reply_to_screen_name",
+            "retweeted_status_id",
+            "geo",
+            "place",
+            "retweet_count",
+            "reply_count",
+            "favorite_count",
+            "num_hashtags",
+            "num_urls",
+            "num_mentions",
+            "timestamp"
+        ]
+        df_bot_tweets = pd.concat([
+            pd.read_csv(
+                path + config['tweet'],
+                nrows=limit_tweets,
+                encoding='latin-1'
+            )[cols].replace(replace_map_dict) for path in paths_bot
+        ]).reset_index(drop=True)
+        df_naive_tweets = pd.concat([
+            pd.read_csv(
+                path + config['tweet'],
+                escapechar='\\',
+                nrows=limit_tweets,
+                encoding='latin-1',
+            )[cols] for path in paths_human
+        ]).reset_index(drop=True)
+        # df_naive_tweets.drop(12, axis=1, inplace=True)
+        # df_naive_tweets.columns = df_bot_tweets.columns
+        df_tweets = pd.concat([df_bot_tweets, df_naive_tweets], ignore_index=True)
+        df_tweets['text'] = df_tweets['text'].fillna('')
+        label = np.concatenate([
+                    np.zeros((df_bot_tweets.shape[0],)),
+                    np.ones((df_naive_tweets.shape[0],))
+                ])
+        return df_tweets['text'], df_tweets.drop('text', axis=1), label
+
+    def feature_tweet(self, tweet_df, adapt_pretrained):
+        if adapt_pretrained:
+            with open('vect/vectorizer_2.pk', 'rb') as fin:
+                vect = pickle.load(fin)
+            v = vect.transform(tweet_df)
+        else:
+            vect = TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=5000)
+            v = vect.fit_transform(tweet_df)
+            with open('vect/vectorizer_2.pk', 'wb') as fin:
+                pickle.dump(vect, fin)
+        return v
+    
+
 if __name__ == "__main__":
-    dataset = TwitterDataset(tfidf_pretrained=False, limit_tweets=None)
-    # torch.save(dataset, 'data/dataset_tfidf.pt')
-    # dataset = torch.load('data/dataset_full.pt')
+    # dataset = TwitterDataset(tfidf_pretrained=False, limit_tweets=None)
+    # torch.save(dataset, 'data/dataset_updated_1.pt')
+    dataset = torch.load('data/dataset_updated_1.pt')
     # dataset.user_mean.to_csv('mean.csv', index=False)
     # dataset.user_std.to_csv('std.csv', index=False)
     # tf = torch.load('data/dataset_tfidf.pt')
     # dataset.tweet = tf.tweet
-    idx = 0
-    sample_user = dataset[idx]
-    print('User')
-    print(sample_user[0])
-    print(sample_user[0].shape)
-    print('Encoded tweet (sparse matrix)')
-    print(sample_user[1])
-    print(sample_user[1].shape)
-    print('Tweet adjacency')
-    print(sample_user[2])
-    print(sample_user[2].shape)
-    print('User-post matrix')
-    print(sample_user[3])
-    print(sample_user[3].shape)
-    print('Label')
-    print(sample_user[4])
-    print(sample_user[4].shape)
-    print('Tweet label')
-    print(sample_user[5])
-    print(sample_user[5].shape)
-    torch.save(dataset, 'data/dataset_full.pt')
+    print('Dataset length: ', len(dataset))
+    indices = [0, 1, 2, 3, 4, 5, 6]
+    for idx in indices:
+        sample_user = dataset[idx]
+        print('User')
+        print(sample_user[0])
+        print(sample_user[0].shape)
+        print('Encoded tweet (sparse matrix)')
+        print(sample_user[1])
+        print(sample_user[1].shape)
+        print('Owner matrix')
+        print(sample_user[2])
+        print(sample_user[2].shape)
+        print('Tweet adjacency')
+        print(sample_user[3])
+        print(sample_user[3].shape)
+        print('User-post matrix')
+        print(sample_user[4])
+        print(sample_user[4].shape)
+        print('Label')
+        print(sample_user[5])
+        print(sample_user[5].shape)
+        print('Tweet label')
+        print(sample_user[6])
+        print(sample_user[6].shape)
+    # torch.save(dataset, 'data/dataset_full.pt')
     # train_loader = DataLoader(dataset, batch_size=32, shuffle=True)
