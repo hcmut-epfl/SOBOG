@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 
 class SOBOG(torch.nn.Module):
+
     def __init__(self, gpu: int, **kwargs):
         super(SOBOG, self).__init__()
         self.user_enc = nn.Linear(kwargs["n_user_features"], kwargs["d_user_embed"])
@@ -13,15 +14,15 @@ class SOBOG(torch.nn.Module):
                                     for _ in range(kwargs["n_gat_layers"])
                                 ])
         self.post_classifier = nn.ModuleList([
-                                    nn.Linear(kwargs["d_post_embed"], kwargs["d_cls"]) if i==0 else
-                                    nn.Linear(kwargs["d_cls"], 1) if i == kwargs["n_cls_layer"]-1 else
-                                    nn.Linear(kwargs["d_cls"], kwargs["d_cls"]) for i in range(kwargs["n_cls_layer"])
+                                    nn.Linear(kwargs["d_post_embed"], kwargs["d_post_cls"]) if i==0 else
+                                    nn.Linear(kwargs["d_post_cls"], 1) if i == kwargs["n_post_cls_layer"]-1 else
+                                    nn.Linear(kwargs["d_post_cls"], kwargs["d_post_cls"]) for i in range(kwargs["n_post_cls_layer"])
                                 ])
         self.post_aggregation = nn.AdaptiveMaxPool1d(1)
         self.user_classifier = nn.ModuleList([
-                                    nn.Linear(kwargs["d_user_embed"] + kwargs["d_post_embed"], 2*kwargs["d_cls"]) if i==0 else
-                                    nn.Linear(2*kwargs["d_cls"], 1) if i == kwargs["n_cls_layer"]-1 else
-                                    nn.Linear(2*kwargs["d_cls"], 2*kwargs["d_cls"]) for i in range(kwargs["n_cls_layer"])
+                                    nn.Linear(kwargs["d_user_embed"] + kwargs["d_post_embed"], 2*kwargs["d_user_cls"]) if i==0 else
+                                    nn.Linear(2*kwargs["d_user_cls"], 1) if i == kwargs["n_user_cls_layer"]-1 else
+                                    nn.Linear(2*kwargs["d_user_cls"], 2*kwargs["d_user_cls"]) for i in range(kwargs["n_user_cls_layer"])
                                 ])
 
     def forward(self, users, posts, post_adjs, up_masking):

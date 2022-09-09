@@ -35,7 +35,6 @@ class TwitterDataset(Dataset):
 
         print("Preprocessing tweet...")
         self.tweet = self.tweet.apply(self.preprocessing)
-        self.tweet[:2000000:2].to_csv('tweets.csv')
 
         print("Vectorizing tweets...")
         self.tweet = self.feature_tweet(self.tweet, tfidf_pretrained)
@@ -43,14 +42,14 @@ class TwitterDataset(Dataset):
         print("Generating tweeting graph... ")
         self.tweet_adj, self.utr_matrix, self.up_matrix = self.generate_adjacency_matrix(tweet_metadata, self.ids)
 
-        print("Identify user property with respect to each tweet...")
-        self.user_prop_for_tweets = tweet_metadata[['user_id']].merge(
-            pd.concat([self.user, self.ids], axis=1),
-            how='left',
-            left_on='user_id',
-            right_on='id').drop(
-                ['id', 'user_id'],
-                axis=1).to_numpy()
+        # print("Identify user property with respect to each tweet...")
+        # self.user_prop_for_tweets = tweet_metadata[['user_id']].merge(
+        #     pd.concat([self.user, self.ids], axis=1),
+        #     how='left',
+        #     left_on='user_id',
+        #     right_on='id').drop(
+        #         ['id', 'user_id'],
+        #         axis=1).to_numpy()
 
         print("Converting user dataframe to numpy...")
         self.user = self.user.to_numpy()
@@ -275,12 +274,13 @@ class TwitterDataset(Dataset):
         tweet_rel = self.utr_matrix[idx].A[0]
         selected_tweet = tweet_rel == 1
         tweet = self.tweet[selected_tweet].A
-        owner = self.user_prop_for_tweets[selected_tweet]
+        # owner = self.user_prop_for_tweets[selected_tweet]
         tlabel = self.tweet_label[selected_tweet]
         adj = self.tweet_adj[np.ix_(selected_tweet, selected_tweet)].A
         up = self.up_matrix[idx, selected_tweet].A[0]
         label = self.label[idx]
-        return user, tweet, owner, adj, up, label, tlabel
+        # return user, tweet, owner, adj, up, label, tlabel
+        return user, tweet, adj, up, label, tlabel
     
     def __len__(self):
         return len(self.user)
@@ -392,7 +392,7 @@ class SecondTwitterDataset(TwitterDataset):
 if __name__ == "__main__":
     # dataset = TwitterDataset(tfidf_pretrained=False, limit_tweets=None)
     # torch.save(dataset, 'data/dataset_updated_1.pt')
-    dataset = torch.load('data/dataset_updated_1.pt')
+    dataset = torch.load('data/dataset_full.pt')
     # dataset.user_mean.to_csv('mean.csv', index=False)
     # dataset.user_std.to_csv('std.csv', index=False)
     # tf = torch.load('data/dataset_tfidf.pt')
@@ -407,20 +407,32 @@ if __name__ == "__main__":
         print('Encoded tweet (sparse matrix)')
         print(sample_user[1])
         print(sample_user[1].shape)
-        print('Owner matrix')
+        print('Tweet adjacency')
         print(sample_user[2])
         print(sample_user[2].shape)
-        print('Tweet adjacency')
+        print('User-post matrix')
         print(sample_user[3])
         print(sample_user[3].shape)
-        print('User-post matrix')
+        print('Label')
         print(sample_user[4])
         print(sample_user[4].shape)
-        print('Label')
+        print('Tweet label')
         print(sample_user[5])
         print(sample_user[5].shape)
-        print('Tweet label')
-        print(sample_user[6])
-        print(sample_user[6].shape)
+        # print('Owner matrix')
+        # print(sample_user[2])
+        # print(sample_user[2].shape)
+        # print('Tweet adjacency')
+        # print(sample_user[3])
+        # print(sample_user[3].shape)
+        # print('User-post matrix')
+        # print(sample_user[4])
+        # print(sample_user[4].shape)
+        # print('Label')
+        # print(sample_user[5])
+        # print(sample_user[5].shape)
+        # print('Tweet label')
+        # print(sample_user[6])
+        # print(sample_user[6].shape)
     # torch.save(dataset, 'data/dataset_full.pt')
     # train_loader = DataLoader(dataset, batch_size=32, shuffle=True)

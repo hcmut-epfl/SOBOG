@@ -5,23 +5,25 @@ from tqdm import tqdm
 from model.SOBOG import SOBOG
 from argparse import ArgumentParser
 from torch.utils.data import DataLoader, random_split
-from data.dataloader import TwitterDataset
+from data.dataloader import TwitterDataset, SecondTwitterDataset
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 
 parser = ArgumentParser(description="SOBOG")
 parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--epoch", type=int, default=2)
 parser.add_argument("--batch_size", type=int, default=32)
-parser.add_argument("--enable_gpu", type=bool, default=True)
+parser.add_argument("--enable_gpu", type=bool, default=False)
 parser.add_argument("--n_user_features", type=int, default=20)
 parser.add_argument("--d_user_embed", type=int, default=50)
-parser.add_argument("--n_post_features", type=int, default=50000)
+parser.add_argument("--n_post_features", type=int, default=5000)
 parser.add_argument("--d_post_embed", type=int, default=100)
 parser.add_argument("--n_gat_layers", type=int, default=3)
-parser.add_argument("--d_cls", type=int, default=16)
-parser.add_argument("--n_cls_layer", type=int, default=4)
 parser.add_argument("--alpha", type=float, default=0.5)
 parser.add_argument("--train_size", type=float, default=0.6)
+parser.add_argument("--d_post_cls", type=int, default=32)
+parser.add_argument("--n_post_cls_layer", type=int, default=2)
+parser.add_argument("--d_user_cls", type=int, default=16)
+parser.add_argument("--n_user_cls_layer", type=int, default=4)
 parser.add_argument("--path", type=str, default='data/dataset_full.pt')
 args = parser.parse_args()
 
@@ -93,7 +95,7 @@ if __name__ == "__main__":
             user_pred, tweet_pred = model.forward(user, tweet, adj, up)
 
             user_loss = loss_user_fn(user_pred, label)
-            tweet_loss = loss_tweet_fn(tweet_pred, tlabel, up)
+            tweet_loss = loss_tweet_fn(tweet_pred, tlabel)
             total_loss = user_loss * args.alpha + tweet_loss * (1 - args.alpha)
 
             total_loss.backward()
