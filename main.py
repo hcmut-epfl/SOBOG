@@ -24,6 +24,10 @@ parser.add_argument("--d_post_cls", type=int, default=32)
 parser.add_argument("--n_post_cls_layer", type=int, default=2)
 parser.add_argument("--d_user_cls", type=int, default=16)
 parser.add_argument("--n_user_cls_layer", type=int, default=4)
+parser.add_argument("--num_edge_type", type=int, default=2)
+parser.add_argument("--trans_head", type=int, default=2)
+parser.add_argument("--semantic_head", type=int, default=2)
+parser.add_argument("--user_embed_dropout", type=float, default=0.3)
 parser.add_argument("--path", type=str, default='data/dataset_full.pt')
 args = parser.parse_args()
 
@@ -78,7 +82,7 @@ if __name__ == "__main__":
     test_losses_epoch = list()
 
     for epoch in range(args.epoch):
-        print(f"Epoch {epoch+1}/{args.epoch}")
+        print("Epoch %d/%d".format(epoch+1, args.epochs))
 
         user_losses, tweet_losses = list(), list()
         train_losses, test_losses = list(), list()

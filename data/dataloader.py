@@ -262,13 +262,6 @@ class TwitterDataset(Dataset):
 
         return tweet_adj_matrix, utr_matrix, up_matrix
 
-    def convert_bsr_to_sparse_torch(self, bsr: scipy.sparse.coo_matrix):
-        bsr = bsr.tocoo()
-        return torch.sparse_coo_tensor(
-            indices = [bsr.row, bsr.col],
-            values = bsr.data
-        )
-
     def __getitem__(self, idx):
         user = self.user[idx]
         tweet_rel = self.utr_matrix[idx].A[0]
