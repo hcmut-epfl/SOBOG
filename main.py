@@ -6,16 +6,17 @@ from model.SOBOG import SOBOG
 from argparse import ArgumentParser
 from torch.utils.data import DataLoader, random_split
 from data.dataloader import TwitterDataset, SecondTwitterDataset
+from data.twidataloader import Twibot22SampleDataset
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 
 parser = ArgumentParser(description="SOBOG")
 parser.add_argument("--lr", type=float, default=0.001)
-parser.add_argument("--epoch", type=int, default=2)
+parser.add_argument("--epoch", type=int, default=10)
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--enable_gpu", type=bool, default=False)
-parser.add_argument("--n_user_features", type=int, default=20)
+parser.add_argument("--n_user_features", type=int, default=15)
 parser.add_argument("--d_user_embed", type=int, default=50)
-parser.add_argument("--n_post_features", type=int, default=5000)
+parser.add_argument("--n_post_features", type=int, default=384)
 parser.add_argument("--d_post_embed", type=int, default=100)
 parser.add_argument("--n_gat_layers", type=int, default=3)
 parser.add_argument("--alpha", type=float, default=0.5)

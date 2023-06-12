@@ -8,8 +8,7 @@ class SOBOG(torch.nn.Module):
 
     def __init__(self, gpu: int, **kwargs):
         super(SOBOG, self).__init__()
-        self.user_enc = RGTLayer(kwargs["num_edge_type"], kwargs["n_user_features"], kwargs["d_user_embed"],
-                                 kwargs["trans_head"], kwargs["semantic_head"], kwargs["user_embed_dropout"])
+        self.user_enc = nn.Linear(kwargs["n_user_features"], kwargs["d_user_embed"])
         self.post_enc = nn.Linear(kwargs["n_post_features"], kwargs["d_post_embed"])
         self.gat = nn.ModuleList([
                                     GAT(kwargs["d_post_embed"], kwargs["d_post_embed"], gpu=gpu) \
