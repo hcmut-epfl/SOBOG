@@ -4,6 +4,9 @@ from model.account_graph import RGTLayer
 import torch
 import torch.nn as nn
 
+from model.multihop import MultiHopGATConv
+
+
 class SOBOG(torch.nn.Module):
 
     def __init__(self, gpu: int, **kwargs):
@@ -11,7 +14,7 @@ class SOBOG(torch.nn.Module):
         self.user_enc = nn.Linear(kwargs["n_user_features"], kwargs["d_user_embed"])
         self.post_enc = nn.Linear(kwargs["n_post_features"], kwargs["d_post_embed"])
         self.gat = nn.ModuleList([
-                                    GAT(kwargs["d_post_embed"], kwargs["d_post_embed"], gpu=gpu) \
+                                    MultiHopGATConv(kwargs["d_post_embed"], kwargs["d_post_embed"], n_hop=5, heads=2, concat=False) \
                                     for _ in range(kwargs["n_gat_layers"])
                                 ])
         self.post_classifier = nn.ModuleList([
