@@ -2,7 +2,7 @@ from types import MethodType
 import numpy as np
 import torch
 from torch import nn
-from main import n_post_features
+from main import n_post_features, n_user_features
 
 
 def set_cuda_visible_device(ngpus):
@@ -10,49 +10,52 @@ def set_cuda_visible_device(ngpus):
     import os
     empty = []
     for i in range(8):
-        command = 'nvidia-smi -i '+str(i)+' | grep "No running" | wc -l'
+        command = 'nvidia-smi -i ' + str(i) + ' | grep "No running" | wc -l'
         output = subprocess.check_output(command, shell=True).decode("utf-8")
-        #print('nvidia-smi -i '+str(i)+' | grep "No running" | wc -l > empty_gpu_check')
-        if int(output)==1:
+        # print('nvidia-smi -i '+str(i)+' | grep "No running" | wc -l > empty_gpu_check')
+        if int(output) == 1:
             empty.append(i)
-    if len(empty)<ngpus:
-        print ('avaliable gpus are less than required')
+    if len(empty) < ngpus:
+        print('avaliable gpus are less than required')
         exit(-1)
     cmd = ''
-    for i in range(ngpus):        
-        cmd+=str(empty[i])+','
+    for i in range(ngpus):
+        cmd += str(empty[i]) + ','
     return cmd
+
 
 def initialize_model(model, device, load_save_file=False, gpu=True):
     if load_save_file:
         if gpu:
-            model.load_state_dict(torch.load(load_save_file)) 
+            model.load_state_dict(torch.load(load_save_file))
         else:
-            model.load_state_dict(torch.load(load_save_file, map_location=torch.device('cpu')))  
+            model.load_state_dict(torch.load(load_save_file, map_location=torch.device('cpu')))
     else:
         for param in model.parameters():
             if param.dim() == 1:
                 continue
                 nn.init.constant(param, 0)
             else:
-                #nn.init.normal(param, 0.0, 0.15)
+                # nn.init.normal(param, 0.0, 0.15)
                 nn.init.xavier_normal_(param)
 
     if torch.cuda.device_count() > 1:
-      print("Let's use", torch.cuda.device_count(), "GPUs!")
-      # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-      model = nn.DataParallel(model)
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
+        model = nn.DataParallel(model)
     model.to(device)
     return model
+
 
 def parse_to_dict(args):
     args_dict = {}
     for arg in dir(args):
-        if not arg.startswith('__') and not isinstance(getattr(args,arg), MethodType):
-            if getattr(args , arg) is not None:
-                args_dict[arg] = getattr(args,arg)
+        if not arg.startswith('__') and not isinstance(getattr(args, arg), MethodType):
+            if getattr(args, arg) is not None:
+                args_dict[arg] = getattr(args, arg)
 
     return args_dict
+
 
 def collate_fn_padd(batch):
     """
@@ -69,7 +72,7 @@ def collate_fn_padd(batch):
     batch_size = len(lengths)
 
     # 5000 is tf-idf dimension, change it when calling any args
-    user = np.zeros((batch_size, 20))
+    user = np.zeros((batch_size, n_user_features))
     tweet = np.zeros((batch_size, max_length, n_post_features))
     adj = np.zeros((batch_size, max_length, max_length))
     up = np.zeros((batch_size, max_length))
@@ -86,7 +89,7 @@ def collate_fn_padd(batch):
             up[i, :l] = u
         label[i] = lab
         tlabel[i, :l] = tlab[:, np.newaxis]
-    
+
     user = torch.from_numpy(user).float()
     tweet = torch.from_numpy(tweet).float()
     adj = torch.from_numpy(adj).float()
@@ -95,6 +98,7 @@ def collate_fn_padd(batch):
     tlabel = torch.from_numpy(tlabel).float()
 
     return user, tweet, adj, up, label, tlabel
+
 
 def tweet_loss_fn(input, output, up_masking):
     losses = list()

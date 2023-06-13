@@ -12,13 +12,13 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score
 parser = ArgumentParser(description="SOBOG")
 parser.add_argument("--lr", type=float, default=0.001)
 parser.add_argument("--epoch", type=int, default=10)
-parser.add_argument("--batch_size", type=int, default=32)
+parser.add_argument("--batch_size", type=int, default=1)
 parser.add_argument("--enable_gpu", type=bool, default=False)
 parser.add_argument("--n_user_features", type=int, default=15)
 parser.add_argument("--d_user_embed", type=int, default=50)
 parser.add_argument("--n_post_features", type=int, default=384)
 parser.add_argument("--d_post_embed", type=int, default=100)
-parser.add_argument("--n_gat_layers", type=int, default=3)
+parser.add_argument("--n_gat_layers", type=int, default=1)
 parser.add_argument("--alpha", type=float, default=0.5)
 parser.add_argument("--train_size", type=float, default=0.6)
 parser.add_argument("--d_post_cls", type=int, default=32)
@@ -29,10 +29,11 @@ parser.add_argument("--num_edge_type", type=int, default=2)
 parser.add_argument("--trans_head", type=int, default=2)
 parser.add_argument("--semantic_head", type=int, default=2)
 parser.add_argument("--user_embed_dropout", type=float, default=0.3)
-parser.add_argument("--path", type=str, default='data/dataset_full.pt')
+parser.add_argument("--path", type=str, default='/content/twibot_22_sample_test_text-sbert_normalized.pt')
 args = parser.parse_args()
 
 n_post_features = args.n_post_features
+n_user_features = args.n_user_features
 
 if __name__ == "__main__":
     dataset = torch.load(args.path)
@@ -47,7 +48,7 @@ if __name__ == "__main__":
         [train_length, test_length],
         torch.manual_seed(0)
     )
-    del(dataset)
+    del (dataset)
 
     train_loader = DataLoader(
         train_set,
@@ -83,7 +84,7 @@ if __name__ == "__main__":
     test_losses_epoch = list()
 
     for epoch in range(args.epoch):
-        print("Epoch %d/%d".format(epoch+1, args.epochs))
+        print("Epoch %d/%d".format(epoch + 1, args.epoch))
 
         user_losses, tweet_losses = list(), list()
         train_losses, test_losses = list(), list()
@@ -113,15 +114,17 @@ if __name__ == "__main__":
             train_losses.append(total_loss.data.cpu().numpy())
             train_true.append(user_pred.data.cpu().numpy())
             train_pred.append(label.data.cpu().numpy())
-            
+
             user, tweet, adj, up = user.to("cpu"), tweet.to("cpu"), adj.to("cpu"), up.to("cpu")
             label, tlabel = label.to("cpu"), tlabel.to("cpu")
             if iter % 10 == 9:
-                user_acc = round((np.round(np.array(train_true)) == np.array(train_pred)).sum() / (args.batch_size * (iter+1)), 4)
+                user_acc = round(
+                    (np.round(np.array(train_true)) == np.array(train_pred)).sum() / (args.batch_size * (iter + 1)), 4)
                 mean_loss = round(np.array(train_losses).mean(), 4)
                 user_loss_mean = round(np.array(user_losses).mean(), 4)
                 tweet_loss_mean = round(np.array(tweet_losses).mean(), 4)
-                print(" loss:", mean_loss, "- acc:", str(user_acc), "- user_loss:", user_loss_mean, "- tweet_loss:", tweet_loss_mean)
+                print(" loss:", mean_loss, "- acc:", str(user_acc), "- user_loss:", user_loss_mean, "- tweet_loss:",
+                      tweet_loss_mean)
         train_losses_epoch.append(np.array(train_losses).mean())
         torch.save(model.state_dict(), "model/model.pt")
         model.eval()
@@ -139,10 +142,10 @@ if __name__ == "__main__":
 
             user, tweet, adj, up = user.to("cpu"), tweet.to("cpu"), adj.to("cpu"), up.to("cpu")
             label, tlabel = label.to("cpu"), tlabel.to("cpu")
-        
+
         test_pred_flattened = np.concatenate(test_pred).ravel()
         test_true_flattened = np.concatenate(test_true).ravel()
-        
+
         print(accuracy_score(test_true_flattened, np.round(test_pred_flattened)))
         print(precision_score(test_true_flattened, np.round(test_pred_flattened)))
         print(recall_score(test_true_flattened, np.round(test_pred_flattened)))
