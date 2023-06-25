@@ -5,17 +5,18 @@ from tqdm import tqdm
 from model.SOBOG import SOBOG
 from argparse import ArgumentParser
 from torch.utils.data import DataLoader, random_split
-from data.dataloader import TwitterDataset, SecondTwitterDataset
-from sklearn.metrics import accuracy_score, precision_score, recall_score
+from data.dataloader import TwitterDataset, SecondTwitterDataset, Twibot22SampleDataset
+from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score
+from sentence_transformers import SentenceTransformer
 
 parser = ArgumentParser(description="SOBOG")
 parser.add_argument("--lr", type=float, default=0.001)
-parser.add_argument("--epoch", type=int, default=2)
+parser.add_argument("--epoch", type=int, default=10)
 parser.add_argument("--batch_size", type=int, default=32)
 parser.add_argument("--enable_gpu", type=bool, default=False)
-parser.add_argument("--n_user_features", type=int, default=20)
+parser.add_argument("--n_user_features", type=int, default=15)
 parser.add_argument("--d_user_embed", type=int, default=50)
-parser.add_argument("--n_post_features", type=int, default=5000)
+parser.add_argument("--n_post_features", type=int, default=384)
 parser.add_argument("--d_post_embed", type=int, default=100)
 parser.add_argument("--n_gat_layers", type=int, default=3)
 parser.add_argument("--alpha", type=float, default=0.5)
@@ -24,26 +25,28 @@ parser.add_argument("--d_post_cls", type=int, default=32)
 parser.add_argument("--n_post_cls_layer", type=int, default=2)
 parser.add_argument("--d_user_cls", type=int, default=16)
 parser.add_argument("--n_user_cls_layer", type=int, default=4)
-parser.add_argument("--path", type=str, default='data/dataset_full.pt')
+parser.add_argument("--train_path", type=str, default='data/twibot_22_sample_train_text-sbert_normalized.pt')
+parser.add_argument("--test_path", type=str, default='data/twibot_22_sample_test_text-sbert_normalized.pt')
 args = parser.parse_args()
 
 n_post_features = args.n_post_features
 
 if __name__ == "__main__":
-    dataset = torch.load(args.path)
+    # dataset = torch.load(args.path)
 
-    n_users = len(dataset)
-    train_size = args.train_size
-    train_length = int(n_users * train_size)
-    test_length = n_users - train_length
+    # n_users = len(dataset)
+    # train_size = args.train_size
+    # train_length = int(n_users * train_size)
+    # test_length = n_users - train_length
 
-    train_set, test_set = random_split(
-        dataset,
-        [train_length, test_length],
-        torch.manual_seed(0)
-    )
-    del(dataset)
-
+    # train_set, test_set = random_split(
+    #     dataset,
+    #     [train_length, test_length],
+    #     torch.manual_seed(0)
+    # )
+    # del(dataset)
+    train_set = torch.load(args.train_path)
+    test_set = torch.load(args.test_path)
     train_loader = DataLoader(
         train_set,
         batch_size=args.batch_size,
@@ -65,6 +68,7 @@ if __name__ == "__main__":
     model = SOBOG(gpu=1 if args.enable_gpu else 0, **arg_dict)
     device = torch.device("cuda:0" if torch.cuda.is_available() and args.enable_gpu else "cpu")
     model = utils.initialize_model(model, device)
+    # model.load_state_dict(torch.load("model/model.pt", map_location=torch.device('cpu')))
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -78,15 +82,14 @@ if __name__ == "__main__":
     test_losses_epoch = list()
 
     for epoch in range(args.epoch):
-        print(f"Epoch {epoch+1}/{args.epoch}")
-
         user_losses, tweet_losses = list(), list()
         train_losses, test_losses = list(), list()
         train_true, test_true = list(), list()
         train_pred, test_pred = list(), list()
 
         model.train()
-        for iter, sample in enumerate(tqdm(train_loader)):
+        pbar = tqdm(enumerate(train_loader), desc=f"Epoch {epoch+1}/{args.epoch}")
+        for iter, sample in pbar:
             model.zero_grad()
             user, tweet, adj, up, label, tlabel = sample
             user, tweet, adj, up = user.to(device), tweet.to(device), adj.to(device), up.to(device)
@@ -102,42 +105,57 @@ if __name__ == "__main__":
             optimizer.step()
 
             # Collect loss, true label and predicted label
-
             user_losses.append(user_loss.data.cpu().numpy())
             tweet_losses.append(tweet_loss.data.cpu().numpy())
             train_losses.append(total_loss.data.cpu().numpy())
-            train_true.append(user_pred.data.cpu().numpy())
-            train_pred.append(label.data.cpu().numpy())
+            train_pred += user_pred.data.cpu().numpy().tolist()
+            train_true += label.data.cpu().numpy().tolist()
             
             user, tweet, adj, up = user.to("cpu"), tweet.to("cpu"), adj.to("cpu"), up.to("cpu")
             label, tlabel = label.to("cpu"), tlabel.to("cpu")
-            if iter % 10 == 9:
-                user_acc = round((np.round(np.array(train_true)) == np.array(train_pred)).sum() / (args.batch_size * (iter+1)), 4)
-                mean_loss = round(np.array(train_losses).mean(), 4)
-                user_loss_mean = round(np.array(user_losses).mean(), 4)
-                tweet_loss_mean = round(np.array(tweet_losses).mean(), 4)
-                print(" loss:", mean_loss, "- acc:", str(user_acc), "- user_loss:", user_loss_mean, "- tweet_loss:", tweet_loss_mean)
-        train_losses_epoch.append(np.array(train_losses).mean())
-        torch.save(model.state_dict(), "model/model.pt")
+            
+            user_acc = np.round((np.round(np.array(train_pred)) == np.array(train_true)).sum() / (args.batch_size * (iter+1)), 4)
+            mean_loss = np.round(np.array(train_losses).mean(), 4)
+            user_loss_mean = np.round(np.array(user_losses).mean(), 4)
+            tweet_loss_mean = np.round(np.array(tweet_losses).mean(), 4)
+            pbar.set_postfix({
+                "loss": mean_loss,
+                "acc": user_acc,
+                "user_loss": user_loss_mean,
+                "tweet_loss": tweet_loss_mean
+            })
+
+        train_pred_flattened = np.concatenate(train_pred).ravel()
+        train_true_flattened = np.concatenate(train_true).ravel()
+
+        torch.save(model.state_dict(), "model/model_sbert.pt")
         model.eval()
         for sample in tqdm(test_loader):
             model.zero_grad()
+            with torch.inference_mode():
+                user, tweet, adj, up, label, tlabel = sample
+                user, tweet, adj, up = user.to(device), tweet.to(device), adj.to(device), up.to(device)
+                label, tlabel = label.to(device), tlabel.to(device)
 
-            user, tweet, adj, up, label, tlabel = sample
-            user, tweet, adj, up = user.to(device), tweet.to(device), adj.to(device), up.to(device)
-            label, tlabel = label.to(device), tlabel.to(device)
+                user_pred, tweet_pred = model.forward(user, tweet, adj, up)
 
-            user_pred, tweet_pred = model.forward(user, tweet, adj, up)
+                test_pred += user_pred.data.cpu().numpy().tolist()
+                test_true += label.data.cpu().numpy().tolist()
 
-            test_pred.append(user_pred.data.cpu().numpy())
-            test_true.append(label.data.cpu().numpy())
-
-            user, tweet, adj, up = user.to("cpu"), tweet.to("cpu"), adj.to("cpu"), up.to("cpu")
-            label, tlabel = label.to("cpu"), tlabel.to("cpu")
+                user, tweet, adj, up = user.to("cpu"), tweet.to("cpu"), adj.to("cpu"), up.to("cpu")
+                label, tlabel = label.to("cpu"), tlabel.to("cpu")
         
         test_pred_flattened = np.concatenate(test_pred).ravel()
         test_true_flattened = np.concatenate(test_true).ravel()
         
-        print(accuracy_score(test_true_flattened, np.round(test_pred_flattened)))
-        print(precision_score(test_true_flattened, np.round(test_pred_flattened)))
-        print(recall_score(test_true_flattened, np.round(test_pred_flattened)))
+        print("Train accuracy:", accuracy_score(train_true_flattened, np.round(train_pred_flattened)))
+        print("Train precision:", precision_score(train_true_flattened, np.round(train_pred_flattened)))
+        print("Train recall:", recall_score(train_true_flattened, np.round(train_pred_flattened)))
+        print("Train F1:", f1_score(train_true_flattened, np.round(train_pred_flattened)))
+        print("Train confusion matrix:", confusion_matrix(train_true_flattened, np.round(train_pred_flattened)))
+        
+        print("Test accuracy:", accuracy_score(test_true_flattened, np.round(test_pred_flattened)))
+        print("Test precision:", precision_score(test_true_flattened, np.round(test_pred_flattened)))
+        print("Test recall:", recall_score(test_true_flattened, np.round(test_pred_flattened)))
+        print("Train F1:", f1_score(test_true_flattened, np.round(test_pred_flattened)))
+        print("Test confusion matrix:", confusion_matrix(test_true_flattened, np.round(test_pred_flattened)))

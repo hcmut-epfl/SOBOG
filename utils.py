@@ -66,10 +66,11 @@ def collate_fn_padd(batch):
     max_length = max(lengths)
     if max_length == 0:
         max_length += 1
+    max_length = min(max_length, 1000)
     batch_size = len(lengths)
 
     # 5000 is tf-idf dimension, change it when calling any args
-    user = np.zeros((batch_size, 20))
+    user = np.zeros((batch_size, 15))
     tweet = np.zeros((batch_size, max_length, n_post_features))
     adj = np.zeros((batch_size, max_length, max_length))
     up = np.zeros((batch_size, max_length))
@@ -81,11 +82,11 @@ def collate_fn_padd(batch):
         l = lengths[i]
         user[i] = us
         if l != 0:
-            tweet[i, :l] = t
-            adj[i, :l, :l] = a
-            up[i, :l] = u
+            tweet[i, :l] = t[:1000]
+            adj[i, :l, :l] = a[:1000, :1000]
+            up[i, :l] = u[:1000]
         label[i] = lab
-        tlabel[i, :l] = tlab[:, np.newaxis]
+        tlabel[i, :l] = tlab[:1000, np.newaxis]
     
     user = torch.from_numpy(user).float()
     tweet = torch.from_numpy(tweet).float()
