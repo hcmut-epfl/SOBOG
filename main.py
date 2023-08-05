@@ -5,9 +5,8 @@ from tqdm import tqdm
 from model.SOBOG import SOBOG
 from argparse import ArgumentParser
 from torch.utils.data import DataLoader, random_split
-from data.dataloader import TwitterDataset, SecondTwitterDataset, Twibot22SampleDataset
+from data.dataloader import Twibot22SampleDataset
 from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score
-from sentence_transformers import SentenceTransformer
 
 parser = ArgumentParser(description="SOBOG")
 parser.add_argument("--lr", type=float, default=0.001)
@@ -25,26 +24,13 @@ parser.add_argument("--d_post_cls", type=int, default=32)
 parser.add_argument("--n_post_cls_layer", type=int, default=2)
 parser.add_argument("--d_user_cls", type=int, default=16)
 parser.add_argument("--n_user_cls_layer", type=int, default=4)
-parser.add_argument("--train_path", type=str, default='data/twibot_22_sample_train_text-sbert_normalized.pt')
-parser.add_argument("--test_path", type=str, default='data/twibot_22_sample_test_text-sbert_normalized.pt')
+parser.add_argument("--train_path", type=str, default='dataset/twibot_22_full_train.pt')
+parser.add_argument("--test_path", type=str, default='dataset/twibot_22_full_train.pt')
 args = parser.parse_args()
 
 n_post_features = args.n_post_features
 
 if __name__ == "__main__":
-    # dataset = torch.load(args.path)
-
-    # n_users = len(dataset)
-    # train_size = args.train_size
-    # train_length = int(n_users * train_size)
-    # test_length = n_users - train_length
-
-    # train_set, test_set = random_split(
-    #     dataset,
-    #     [train_length, test_length],
-    #     torch.manual_seed(0)
-    # )
-    # del(dataset)
     train_set = torch.load(args.train_path)
     test_set = torch.load(args.test_path)
     train_loader = DataLoader(
@@ -60,15 +46,10 @@ if __name__ == "__main__":
         collate_fn=utils.collate_fn_padd
     )
 
-    # Initialize the model
-    # if args.n_gpu > 0:
-    #     cmd = utils.set_cuda_visible_device(args.n_gpu)
-    #     os.environ['CUDA_VISIBLE_DEVICES'] = cmd[:-1]
     arg_dict = utils.parse_to_dict(args)
     model = SOBOG(gpu=1 if args.enable_gpu else 0, **arg_dict)
     device = torch.device("cuda:0" if torch.cuda.is_available() and args.enable_gpu else "cpu")
     model = utils.initialize_model(model, device)
-    # model.load_state_dict(torch.load("model/model.pt", map_location=torch.device('cpu')))
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)

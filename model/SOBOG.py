@@ -7,6 +7,7 @@ class SOBOG(torch.nn.Module):
 
     def __init__(self, gpu: int, **kwargs):
         super(SOBOG, self).__init__()
+        self.user_batch_norm = nn.BatchNorm1d(kwargs["n_user_features"])
         self.user_enc = nn.Linear(kwargs["n_user_features"], kwargs["d_user_embed"])
         self.post_enc = nn.Linear(kwargs["n_post_features"], kwargs["d_post_embed"])
         self.gat = nn.ModuleList([
@@ -26,6 +27,7 @@ class SOBOG(torch.nn.Module):
                                 ])
 
     def forward(self, users, posts, post_adjs, up_masking):
+        users = self.user_batch_norm(users)
         users_embed = self.user_enc(users)
         posts_embed = self.post_enc(posts)
 

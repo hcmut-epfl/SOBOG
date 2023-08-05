@@ -2,7 +2,8 @@ from types import MethodType
 import numpy as np
 import torch
 from torch import nn
-from main import n_post_features
+from main import args
+from sentence_transformers import SentenceTransformer
 
 
 def set_cuda_visible_device(ngpus):
@@ -54,6 +55,12 @@ def parse_to_dict(args):
 
     return args_dict
 
+
+########## NEW: SBERT Encoder ##############
+encoder = SentenceTransformer('all-MiniLM-L6-v2')
+############################################
+
+
 def collate_fn_padd(batch):
     """
     Padds batch of variable length
@@ -66,13 +73,11 @@ def collate_fn_padd(batch):
     max_length = max(lengths)
     if max_length == 0:
         max_length += 1
-    max_length = min(max_length, 1000)
     batch_size = len(lengths)
 
-    # 5000 is tf-idf dimension, change it when calling any args
-    user = np.zeros((batch_size, 15))
-    tweet = np.zeros((batch_size, max_length, n_post_features))
-    adj = np.zeros((batch_size, max_length, max_length))
+    user = np.zeros((batch_size, args.n_user_features))
+    tweet = np.zeros((batch_size, max_length, args.n_post_features))
+    adj = torch.zeros((batch_size, max_length, max_length))
     up = np.zeros((batch_size, max_length))
     label = np.zeros((batch_size, 1))
     tlabel = np.zeros((batch_size, max_length, 1))
@@ -82,15 +87,16 @@ def collate_fn_padd(batch):
         l = lengths[i]
         user[i] = us
         if l != 0:
-            tweet[i, :l] = t[:1000]
-            adj[i, :l, :l] = a[:1000, :1000]
-            up[i, :l] = u[:1000]
+            a = a.reshape(2, -1)
+            tweet[i, :l] = encoder.encode(t[:l])
+            adj[i, :l, :l] = torch.sparse.FloatTensor(torch.tensor(a, dtype=torch.int64), torch.tensor([1] * a.shape[1]), torch.Size([l, l])).to_dense()
+            up[i, :l] = u
         label[i] = lab
-        tlabel[i, :l] = tlab[:1000, np.newaxis]
+        tlabel[i, :l] = tlab[:, np.newaxis]
     
     user = torch.from_numpy(user).float()
     tweet = torch.from_numpy(tweet).float()
-    adj = torch.from_numpy(adj).float()
+    adj = adj
     up = torch.from_numpy(up).float()
     label = torch.from_numpy(label).float()
     tlabel = torch.from_numpy(tlabel).float()
