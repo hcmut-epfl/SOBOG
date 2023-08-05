@@ -155,7 +155,7 @@ cython_debug/
 
 .cpython-38.pyc
 
-data/*.pt
-model/*.pt
+data/
+model/
 vectorizer.pk
 *.pt
